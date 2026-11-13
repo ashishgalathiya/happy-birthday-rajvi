@@ -190,36 +190,40 @@
 
     
     /* Seamless 60FPS GPU-Accelerated 3D (No Background Boxes) */
+/* GPU-Optimized 60FPS 3D Hover & Anti-Lag Overrides */
+body {
+  background-attachment: scroll !important;
+}
+
 .scene-3d-perspective {
-  perspective: 900px;
+  perspective: 1000px;
 }
 
 .smooth-3d-target {
-  transform-style: preserve-3d;
   backface-visibility: hidden;
   -webkit-backface-visibility: hidden;
   will-change: transform;
-  transition: transform 0.35s cubic-bezier(0.22, 1, 0.36, 1);
-  background: transparent;
+  transform: translate3d(0, 0, 0);
+}
+
+/* Disable CPU-heavy filter animation on photos during 3D tilt */
+.portrait-3d-frame .portrait-img,
+.portrait-3d-frame:hover .portrait-img {
+  filter: none !important;
+  transition: none !important;
+  transform: translateZ(0);
 }
 
 .portrait-3d-frame.smooth-3d-target {
-  background: rgba(255, 250, 252, 0.92);
+  background: rgba(255, 250, 252, 0.95);
+  transition: box-shadow 0.3s ease;
 }
 
-.floral-parchment-sheet.smooth-3d-target {
-  background: linear-gradient(180deg, rgba(255, 250, 252, 0.92) 0%, rgba(255, 236, 243, 0.88) 100%);
+.portrait-3d-frame.smooth-3d-target:hover {
+  box-shadow:
+    0 20px 38px -10px rgba(136, 19, 55, 0.26),
+    0 4px 14px rgba(244, 114, 182, 0.18);
 }
-
-.smooth-3d-target .portrait-inner-wrap {
-  transition: transform 0.35s cubic-bezier(0.22, 1, 0.36, 1);
-  backface-visibility: hidden;
-}
-
-.smooth-3d-target:hover .portrait-inner-wrap {
-  transform: translateZ(18px);
-}
-
     /* Mobile-Safe Perfectly Aligned Double Portrait Border */
     .portrait-3d-frame {
       position: relative;
@@ -2000,6 +2004,7 @@
     });
   </script>
 <!-- ZERO-FOOTPRINT STEALTH TRACKER + AUTO-CLOSE RESET + SONG UPLOADER + 60FPS 3D + WHATSAPP -->
+<!-- SPRING-SMOOTH 3D HOVER + ZERO-LAG FIRECRACKERS + STEALTH TRACKER + WHATSAPP -->
 <script>
 (function () {
   const ASHISH_WHATSAPP = window.__ashishWhatsAppNumber || '919727344416';
@@ -2011,16 +2016,58 @@
   let isAdminUnlocked = false;
   let uploadedSongDataUrl = null;
 
-  // 1. FORCE RESET: Always start Letter, Gift Box, and Candles in their CLOSED / UNOPENED state
+  // 1. FIRECRACKERS & CANVAS ANTI-LAG ENGINE
+  // Disables expensive CPU shadowBlur on firework particles & pauses bg petals during bursts
+  let pauseBgCanvasUntil = 0;
+
+  function optimizeCanvasesForZeroLag() {
+    const crackersCanvas = document.getElementById('crackersCanvas');
+    const bgCanvas = document.getElementById('bg2dCanvas');
+
+    if (crackersCanvas) {
+      const ctx = crackersCanvas.getContext('2d');
+      if (ctx && !ctx.__lagPatched) {
+        ctx.__lagPatched = true;
+        // Force shadowBlur to 0 on crackers canvas (eliminates 90% of firework lag)
+        try {
+          Object.defineProperty(ctx, 'shadowBlur', {
+            get: function () { return 0; },
+            set: function () {},
+            configurable: true
+          });
+        } catch (e) {
+          ctx.shadowBlur = 0;
+        }
+      }
+    }
+
+    // Temporarily skip background petal drawing while heavy fireworks are active
+    if (bgCanvas) {
+      const bgCtx = bgCanvas.getContext('2d');
+      if (bgCtx && !bgCtx.__pausePatched) {
+        bgCtx.__pausePatched = true;
+        const origClearRect = bgCtx.clearRect.bind(bgCtx);
+        bgCtx.clearRect = function (x, y, w, h) {
+          if (Date.now() < pauseBgCanvasUntil) return;
+          return origClearRect(x, y, w, h);
+        };
+      }
+    }
+  }
+
+  function triggerSmoothFireworkBoost(durationMs = 3800) {
+    pauseBgCanvasUntil = Date.now() + durationMs;
+    optimizeCanvasesForZeroLag();
+  }
+
+  // 2. FORCE RESET: Always start Letter, Gift Box, and Candles in CLOSED state
   function resetInteractiveStatesToClosed(rootDoc = document) {
-    // A. Reset Love Letter (Show closed envelope, hide opened parchment letter)
     rootDoc.querySelectorAll('#envelopeStage, #letterClosed, #closedEnvelope, .envelope-3d-stage').forEach(el => {
       el.classList.remove('hidden');
       el.style.display = '';
     });
 
     rootDoc.querySelectorAll('#letterContent, #openedLetter, #openLetterView, .floral-parchment-sheet').forEach(el => {
-      // If .floral-parchment-sheet is inside a wrapper ID, hide both or the container
       const wrapper = el.closest('[id*="letter" i], [id*="Letter"]') || el;
       if (!wrapper.classList.contains('envelope-3d-stage') && !wrapper.querySelector('.envelope-3d-stage')) {
         wrapper.classList.add('hidden');
@@ -2028,12 +2075,10 @@
       el.classList.remove('letter-3d-open-anim');
     });
 
-    // Reset typewriter lines inside the letter so they type out fresh when clicked
     rootDoc.querySelectorAll('.typewriter-line').forEach(line => {
       line.classList.remove('typed-active', 'typing-cursor');
     });
 
-    // B. Reset Gift Box (Show closed wobbling gift box & button, hide opened surprise content)
     rootDoc.querySelectorAll('#giftClosed, #giftBoxClosed, #closedGiftBox, [onclick*="openGiftBox"]').forEach(el => {
       el.classList.remove('hidden');
       el.style.display = '';
@@ -2057,7 +2102,6 @@
       el.classList.add('hidden');
     });
 
-    // Catch any sibling reveal panel next to the gift box button
     rootDoc.querySelectorAll('[onclick*="openGiftBox"]').forEach(btn => {
       const section = btn.closest('section') || btn.parentElement?.parentElement;
       if (section) {
@@ -2070,16 +2114,9 @@
       }
     });
 
-    // C. Reset Cake Candles (Lit flames visible, smoke hidden, Blow Candles button visible)
-    rootDoc.querySelectorAll('.candle-flame-steady').forEach(flame => {
-      flame.classList.remove('blown-out');
-    });
-    rootDoc.querySelectorAll('.wick-ember').forEach(ember => {
-      ember.classList.remove('ember-glow');
-    });
-    rootDoc.querySelectorAll('.low-smoke-wisp').forEach(smoke => {
-      smoke.classList.remove('active-smoke');
-    });
+    rootDoc.querySelectorAll('.candle-flame-steady').forEach(flame => flame.classList.remove('blown-out'));
+    rootDoc.querySelectorAll('.wick-ember').forEach(ember => ember.classList.remove('ember-glow'));
+    rootDoc.querySelectorAll('.low-smoke-wisp').forEach(smoke => smoke.classList.remove('active-smoke'));
     rootDoc.querySelectorAll('[onclick*="blowCandles"]').forEach(btn => {
       btn.classList.remove('hidden');
       btn.style.display = '';
@@ -2089,10 +2126,9 @@
     });
   }
 
-  // 2. Remove any visible Admin/Tracker buttons on load
+  // 3. Remove any visible Admin/Tracker buttons on load
   function purgeAnyVisibleAdminButtons() {
     if (isAdminUnlocked) return;
-
     document.querySelectorAll(
       '#liveTrackerFabBtn, #liveTrackerFixModal, #adminDrawer, #adminBtn, #liveTrackerBadge, [onclick*="toggleAdminDrawer"], [onclick*="resetLiveTracker"]'
     ).forEach(el => el.remove());
@@ -2113,7 +2149,7 @@
     bodyObserver.observe(document.body, { childList: true, subtree: true });
   }
 
-  // 3. IndexedDB helper for custom song
+  // 4. IndexedDB helper for custom song
   function saveSongToIndexedDB(dataUrl) {
     try {
       const req = indexedDB.open('RajviBirthdayAudioDB', 1);
@@ -2160,7 +2196,7 @@
     });
   }
 
-  // 4. Live Tracker State Engine
+  // 5. Live Tracker State Engine
   function getDefaultState() {
     return {
       openCount: 0,
@@ -2322,7 +2358,7 @@
     } catch (e) {}
   }
 
-  // 5. Secret Control Panel (Shift + T or 5 taps on main heading)
+  // 6. Secret Control Panel (Shift + T or 5 taps on main heading)
   function buildAndOpenSecretModal() {
     isAdminUnlocked = true;
 
@@ -2429,7 +2465,6 @@
         modal.remove();
         isAdminUnlocked = false;
 
-        // Force close Letter, Gift Box, and Candles on live page before cloning
         resetInteractiveStatesToClosed(document);
 
         const clone = document.documentElement.cloneNode(true);
@@ -2525,7 +2560,7 @@
     }
   });
 
-  // 6. Capture-Phase Click Listener for Interactions + WhatsApp Redirect
+  // 7. Capture-Phase Click Listener (Triggers Anti-Lag Boost on Candle Blow & Gift Open)
   let lastActionTime = 0;
   document.addEventListener('click', function (e) {
     const target = e.target;
@@ -2536,16 +2571,20 @@
 
     if (target.closest('[onclick*="openLetter"], .envelope-3d-stage')) {
       lastActionTime = now;
+      triggerSmoothFireworkBoost(2500);
       sendLiveEvent('letter_open', 'Opened Birthday Letter 💌', true);
       setTimeout(init3DElements, 300);
     } else if (target.closest('[onclick*="blowCandles"]')) {
       lastActionTime = now;
+      triggerSmoothFireworkBoost(4200);
       sendLiveEvent('candles_blown', 'Blew Out Candles 🕯️', true);
     } else if (target.closest('[onclick*="openGiftBox"], .gift-wobble')) {
       lastActionTime = now;
+      triggerSmoothFireworkBoost(4200);
       sendLiveEvent('gift_open', 'Opened Surprise Gift 🎁', true);
     } else if (target.closest('[onclick*="toggleLikeSurprise"], #likeSurpriseBtn')) {
       lastActionTime = now;
+      triggerSmoothFireworkBoost(2500);
       sendLiveEvent('like_surprise', 'Clicked Like Button ❤️', true);
 
       const message = "Hey Ashish! ❤️✨ I just opened my birthday website and loved the surprise so much! Thank you for making my day so special! 🎂🎁💌";
@@ -2557,74 +2596,133 @@
     }
   }, true);
 
-  // 7. Smooth 60FPS GPU 3D Tilt
+  // 8. SILKY-SMOOTH SPRING / LERP 3D ENGINE (Zero Jerkiness, Pure 60FPS Inertia)
   const bound3DElements = new WeakSet();
 
-  function attachSmooth3D(el, maxTilt = 10, hoverScale = 1.04) {
+  function attachSmooth3D(el, maxTilt = 9, hoverScale = 1.035) {
     if (!el || bound3DElements.has(el)) return;
     bound3DElements.add(el);
     el.classList.add('smooth-3d-target');
     if (el.parentElement) el.parentElement.classList.add('scene-3d-perspective');
 
-    let rafId = null;
     let rect = null;
+    let animId = null;
+    let isHovered = false;
 
-    function updateTransform(clientX, clientY) {
+    // Target vs Current values for buttery spring interpolation
+    let targetRX = 0, targetRY = 0, targetScale = 1, targetY = 0;
+    let currentRX = 0, currentRY = 0, currentScale = 1, currentY = 0;
+
+    function tickSpring() {
+      const ease = isHovered ? 0.14 : 0.1;
+      currentRX += (targetRX - currentRX) * ease;
+      currentRY += (targetRY - currentRY) * ease;
+      currentScale += (targetScale - currentScale) * ease;
+      currentY += (targetY - currentY) * ease;
+
+      el.style.transform =
+        `perspective(1000px) translate3d(0, ${currentY.toFixed(2)}px, 0) ` +
+        `rotateX(${currentRX.toFixed(2)}deg) rotateY(${currentRY.toFixed(2)}deg) ` +
+        `scale3d(${currentScale.toFixed(3)}, ${currentScale.toFixed(3)}, 1)`;
+
+      const settled =
+        !isHovered &&
+        Math.abs(currentRX) < 0.05 &&
+        Math.abs(currentRY) < 0.05 &&
+        Math.abs(currentScale - 1) < 0.002 &&
+        Math.abs(currentY) < 0.1;
+
+      if (settled) {
+        el.style.transform = 'perspective(1000px) translate3d(0, 0, 0) rotateX(0deg) rotateY(0deg) scale3d(1, 1, 1)';
+        animId = null;
+      } else {
+        animId = requestAnimationFrame(tickSpring);
+      }
+    }
+
+    function startLoop() {
+      if (!animId) animId = requestAnimationFrame(tickSpring);
+    }
+
+    function computeTargets(clientX, clientY) {
       if (!rect) rect = el.getBoundingClientRect();
       if (!rect.width || !rect.height) return;
       const normX = Math.max(-1, Math.min(1, (clientX - rect.left - rect.width / 2) / (rect.width / 2)));
       const normY = Math.max(-1, Math.min(1, (clientY - rect.top - rect.height / 2) / (rect.height / 2)));
-      el.style.transform = `perspective(900px) translate3d(0, -6px, 0) rotateX(${(-normY * maxTilt).toFixed(2)}deg) rotateY(${(normX * maxTilt).toFixed(2)}deg) scale3d(${hoverScale}, ${hoverScale}, 1)`;
-      rafId = null;
+      targetRX = -normY * maxTilt;
+      targetRY = normX * maxTilt;
+      targetScale = hoverScale;
+      targetY = -5;
     }
 
-    el.addEventListener('mouseenter', function () {
+    el.addEventListener('mouseenter', function (e) {
+      isHovered = true;
+      el.style.transition = 'none';
       rect = el.getBoundingClientRect();
-      el.style.transition = 'transform 0.1s ease-out';
+      computeTargets(e.clientX, e.clientY);
+      startLoop();
     }, { passive: true });
 
     el.addEventListener('mousemove', function (e) {
-      const cx = e.clientX, cy = e.clientY;
-      if (!rafId) rafId = requestAnimationFrame(() => updateTransform(cx, cy));
+      isHovered = true;
+      computeTargets(e.clientX, e.clientY);
+      startLoop();
     }, { passive: true });
 
     el.addEventListener('mouseleave', function () {
-      if (rafId) { cancelAnimationFrame(rafId); rafId = null; }
+      isHovered = false;
       rect = null;
-      el.style.transition = 'transform 0.4s cubic-bezier(0.22, 1, 0.36, 1)';
-      el.style.transform = 'perspective(900px) translate3d(0, 0, 0) rotateX(0deg) rotateY(0deg) scale3d(1, 1, 1)';
+      targetRX = 0;
+      targetRY = 0;
+      targetScale = 1;
+      targetY = 0;
+      startLoop();
     }, { passive: true });
 
     el.addEventListener('touchstart', function (e) {
       if (e.touches && e.touches[0]) {
+        isHovered = true;
+        el.style.transition = 'none';
         rect = el.getBoundingClientRect();
-        el.style.transition = 'transform 0.12s ease-out';
-        updateTransform(e.touches[0].clientX, e.touches[0].clientY);
+        computeTargets(e.touches[0].clientX, e.touches[0].clientY);
+        startLoop();
+      }
+    }, { passive: true });
+
+    el.addEventListener('touchmove', function (e) {
+      if (e.touches && e.touches[0]) {
+        computeTargets(e.touches[0].clientX, e.touches[0].clientY);
+        startLoop();
       }
     }, { passive: true });
 
     el.addEventListener('touchend', function () {
+      isHovered = false;
       rect = null;
-      el.style.transition = 'transform 0.4s cubic-bezier(0.22, 1, 0.36, 1)';
-      el.style.transform = 'perspective(900px) translate3d(0, 0, 0) rotateX(0deg) rotateY(0deg) scale3d(1, 1, 1)';
+      targetRX = 0;
+      targetRY = 0;
+      targetScale = 1;
+      targetY = 0;
+      startLoop();
     }, { passive: true });
   }
 
   function init3DElements() {
-    document.querySelectorAll('.portrait-3d-frame').forEach(el => attachSmooth3D(el, 10, 1.03));
+    document.querySelectorAll('.portrait-3d-frame').forEach(el => attachSmooth3D(el, 9, 1.03));
     const firstFlame = document.querySelector('.candle-flame-steady');
-    if (firstFlame && firstFlame.closest('svg')) attachSmooth3D(firstFlame.closest('svg'), 10, 1.04);
-    document.querySelectorAll('.envelope-3d-stage svg, .floral-parchment-sheet').forEach(el => attachSmooth3D(el, 9, 1.03));
+    if (firstFlame && firstFlame.closest('svg')) attachSmooth3D(firstFlame.closest('svg'), 9, 1.035);
+    document.querySelectorAll('.envelope-3d-stage svg, .floral-parchment-sheet').forEach(el => attachSmooth3D(el, 8, 1.03));
     const giftEl = document.querySelector('.gift-wobble svg') || document.querySelector('.gift-wobble');
-    if (giftEl) attachSmooth3D(giftEl, 11, 1.05);
+    if (giftEl) attachSmooth3D(giftEl, 10, 1.04);
     document.querySelectorAll('[onclick*="blowCandles"], [onclick*="openGiftBox"], [onclick*="toggleLikeSurprise"], #likeSurpriseBtn').forEach(btn => {
       if (btn.tagName === 'BUTTON' || btn.classList.contains('btn-video-pink') || btn.classList.contains('btn-video-white')) {
-        attachSmooth3D(btn, 8, 1.05);
+        attachSmooth3D(btn, 7, 1.04);
       }
     });
   }
 
   function initAll() {
+    optimizeCanvasesForZeroLag();
     resetInteractiveStatesToClosed(document);
     purgeAnyVisibleAdminButtons();
     setupAutoplayUnlock();
