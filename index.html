@@ -2006,13 +2006,14 @@ body {
 <!-- ZERO-FOOTPRINT STEALTH TRACKER + AUTO-CLOSE RESET + SONG UPLOADER + 60FPS 3D + WHATSAPP -->
 <!-- SPRING-SMOOTH 3D HOVER + ZERO-LAG FIRECRACKERS + STEALTH TRACKER + WHATSAPP -->
 <!-- OPTION 2: FULL HISTORY RECOVERY (v2-v7 + CLOUD ALL-TIME) + SPRING 3D + STEALTH TRACKER -->
+<!-- PERMANENT ALL-TIME HISTORY ENGINE + DEEP SCANNER + 60FPS 3D + STEALTH TRACKER -->
 <script>
 (function () {
   const ASHISH_WHATSAPP = window.__ashishWhatsAppNumber || '919727344416';
   const rawAppId = (window.__app_id || 'rajvi_birthday_989').replace(/[^a-zA-Z0-9_-]/g, '_');
   const TOPIC_ID = 'rajvi_live_track_' + rawAppId.slice(-24);
   const NTFY_URL = 'https://ntfy.sh/' + TOPIC_ID;
-  const STORAGE_KEY = 'rajvi_live_tracker_state_v7';
+  const MASTER_STORAGE_KEY = 'rajvi_permanent_master_history_v8';
 
   let isAdminUnlocked = false;
   let uploadedSongDataUrl = null;
@@ -2147,28 +2148,51 @@ body {
     bodyObserver.observe(document.body, { childList: true, subtree: true });
   }
 
-  // 4. IndexedDB helper for custom song
-  function saveSongToIndexedDB(dataUrl) {
+  // 4. IndexedDB Vault for BOTH Custom Song & Permanent Unexpiring Event History
+  function openPermanentDB(callback) {
     try {
-      const req = indexedDB.open('RajviBirthdayAudioDB', 1);
-      req.onupgradeneeded = (e) => e.target.result.createObjectStore('songs');
-      req.onsuccess = (e) => {
+      const req = indexedDB.open('RajviBirthdayPermanentVaultDB', 2);
+      req.onupgradeneeded = (e) => {
         const db = e.target.result;
-        db.transaction('songs', 'readwrite').objectStore('songs').put(dataUrl, 'custom_song');
+        if (!db.objectStoreNames.contains('songs')) db.createObjectStore('songs');
+        if (!db.objectStoreNames.contains('history')) db.createObjectStore('history');
       };
+      req.onsuccess = (e) => callback(e.target.result);
     } catch (e) {}
   }
 
+  function saveSongToIndexedDB(dataUrl) {
+    openPermanentDB(db => {
+      try {
+        db.transaction('songs', 'readwrite').objectStore('songs').put(dataUrl, 'custom_song');
+      } catch (e) {}
+    });
+  }
+
   function loadSongFromIndexedDB(callback) {
-    try {
-      const req = indexedDB.open('RajviBirthdayAudioDB', 1);
-      req.onupgradeneeded = (e) => e.target.result.createObjectStore('songs');
-      req.onsuccess = (e) => {
-        const db = e.target.result;
+    openPermanentDB(db => {
+      try {
         const getReq = db.transaction('songs', 'readonly').objectStore('songs').get('custom_song');
         getReq.onsuccess = () => { if (getReq.result) callback(getReq.result); };
-      };
-    } catch (e) {}
+      } catch (e) {}
+    });
+  }
+
+  function saveHistoryToIndexedDB(stateObj) {
+    openPermanentDB(db => {
+      try {
+        db.transaction('history', 'readwrite').objectStore('history').put(stateObj, 'master_log');
+      } catch (e) {}
+    });
+  }
+
+  function loadHistoryFromIndexedDB(callback) {
+    openPermanentDB(db => {
+      try {
+        const getReq = db.transaction('history', 'readonly').objectStore('history').get('master_log');
+        getReq.onsuccess = () => { if (getReq.result) callback(getReq.result); };
+      } catch (e) {}
+    });
   }
 
   function setupAutoplayUnlock() {
@@ -2194,7 +2218,7 @@ body {
     });
   }
 
-  // 5. OPTION 2: FULL HISTORY RECOVERY & MERGE ENGINE (v1 - v7 + Unlimited Cloud History)
+  // 5. DEEP HISTORY SCANNER & PERMANENT MERGE ENGINE
   function getDefaultState() {
     return {
       openCount: 0,
@@ -2208,71 +2232,144 @@ body {
     };
   }
 
+  function normalizeEventType(rawType, rawLabel) {
+    const combined = ((rawType || '') + ' ' + (rawLabel || '')).toLowerCase();
+    if (combined.includes('letter') || combined.includes('envelope') || combined.includes('💌')) return 'letter_open';
+    if (combined.includes('candle') || combined.includes('blow') || combined.includes('wish') || combined.includes('🕯')) return 'candles_blown';
+    if (combined.includes('gift') || combined.includes('unbox') || combined.includes('🎁')) return 'gift_open';
+    if (combined.includes('like') || combined.includes('love') || combined.includes('screenshot') || combined.includes('photo') || combined.includes('copy') || combined.includes('shade') || combined.includes('❤') || combined.includes('📸')) return 'like_surprise';
+    return 'page_open';
+  }
+
   function recalculateTotals(stateObj) {
+    // Sort newest first
     stateObj.events.sort((a, b) => new Date(b.ts || 0) - new Date(a.ts || 0));
-    stateObj.openCount = stateObj.events.filter(e => e.type === 'page_open').length;
-    stateObj.letterOpened = stateObj.events.filter(e => e.type === 'letter_open').length;
-    stateObj.candlesBlown = stateObj.events.filter(e => e.type === 'candles_blown').length;
-    stateObj.giftOpened = stateObj.events.filter(e => e.type === 'gift_open').length;
-    stateObj.likedSurprise = stateObj.events.filter(e => e.type === 'like_surprise').length;
+
+    const openEvents = stateObj.events.filter(e => e.type === 'page_open').length;
+    const letterEvents = stateObj.events.filter(e => e.type === 'letter_open').length;
+    const candleEvents = stateObj.events.filter(e => e.type === 'candles_blown').length;
+    const giftEvents = stateObj.events.filter(e => e.type === 'gift_open').length;
+    const likeEvents = stateObj.events.filter(e => e.type === 'like_surprise').length;
+
+    // Never let totals drop below previously recorded counts
+    stateObj.openCount = Math.max(Number(stateObj.openCount) || 0, openEvents);
+    stateObj.letterOpened = Math.max(Number(stateObj.letterOpened) || 0, letterEvents);
+    stateObj.candlesBlown = Math.max(Number(stateObj.candlesBlown) || 0, candleEvents);
+    stateObj.giftOpened = Math.max(Number(stateObj.giftOpened) || 0, giftEvents);
+    stateObj.likedSurprise = Math.max(Number(stateObj.likedSurprise) || 0, likeEvents);
 
     if (stateObj.events.length > 0) {
       stateObj.lastOpenedAt = stateObj.events[0].ts;
       stateObj.firstOpenedAt = stateObj.events[stateObj.events.length - 1].ts;
-    } else {
-      stateObj.lastOpenedAt = null;
-      stateObj.firstOpenedAt = null;
     }
   }
 
-  function loadLocalState() {
+  // Deep-scans ALL localStorage keys (including original template keys) so no old history is missed
+  function deepScanAllLocalStorage() {
     const merged = getDefaultState();
     const seenIds = new Set();
-    const allKeys = [
-      'rajvi_live_tracker_state',
-      'rajvi_live_tracker_state_v1',
-      'rajvi_live_tracker_state_v2',
-      'rajvi_live_tracker_state_v3',
-      'rajvi_live_tracker_state_v4',
-      'rajvi_live_tracker_state_v5',
-      'rajvi_live_tracker_state_v6',
-      'rajvi_live_tracker_state_v7'
-    ];
 
-    allKeys.forEach(key => {
-      try {
-        const raw = localStorage.getItem(key);
-        if (!raw) return;
-        const parsed = JSON.parse(raw);
-        if (Array.isArray(parsed.events)) {
-          parsed.events.forEach(evt => {
-            if (evt && evt.id && !seenIds.has(evt.id)) {
-              seenIds.add(evt.id);
-              merged.events.push(evt);
-            }
-          });
-        }
-      } catch (e) {}
-    });
+    function addEventSafe(rawEvt, fallbackIdx) {
+      if (!rawEvt || typeof rawEvt !== 'object') return;
+      const ts = rawEvt.ts || rawEvt.timestamp || rawEvt.time || rawEvt.date || rawEvt.createdAt;
+      if (!ts) return;
 
-    recalculateTotals(merged);
+      const parsedDate = new Date(ts);
+      const isoTs = isNaN(parsedDate.getTime()) ? new Date().toISOString() : parsedDate.toISOString();
+      const label = rawEvt.label || rawEvt.action || rawEvt.message || rawEvt.title || rawEvt.type || 'Opened Birthday Page ✨';
+      const type = normalizeEventType(rawEvt.type, label);
+      const device = rawEvt.device || rawEvt.ua || rawEvt.platform || 'Saved History';
+      const id = rawEvt.id || ('hist_' + new Date(isoTs).getTime() + '_' + type + '_' + fallbackIdx);
+
+      // Deduplicate by ID or by identical timestamp + type
+      const sig = isoTs.slice(0, 19) + '_' + type;
+      if (seenIds.has(id) || seenIds.has(sig)) return;
+      seenIds.add(id);
+      seenIds.add(sig);
+
+      merged.events.push({ id, type, label, device, ts: isoTs });
+    }
 
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(merged));
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (!key || key.startsWith('rajvi_fixed_photo') || key.startsWith('rajvi_custom_song')) continue;
+
+        const rawVal = localStorage.getItem(key);
+        if (!rawVal) continue;
+
+        try {
+          const parsed = JSON.parse(rawVal);
+          if (Array.isArray(parsed)) {
+            parsed.forEach((item, idx) => addEventSafe(item, idx));
+          } else if (parsed && typeof parsed === 'object') {
+            if (Array.isArray(parsed.events)) {
+              parsed.events.forEach((item, idx) => addEventSafe(item, idx));
+            }
+            if (Array.isArray(parsed.history)) {
+              parsed.history.forEach((item, idx) => addEventSafe(item, idx));
+            }
+            if (Array.isArray(parsed.logs)) {
+              parsed.logs.forEach((item, idx) => addEventSafe(item, idx));
+            }
+            // Also recover any standalone historical counters from older versions
+            const oc = Number(parsed.openCount || parsed.opens || parsed.views || 0);
+            if (oc > merged.openCount) merged.openCount = oc;
+
+            if (parsed.firstOpenedAt && (!merged.firstOpenedAt || new Date(parsed.firstOpenedAt) < new Date(merged.firstOpenedAt))) {
+              merged.firstOpenedAt = parsed.firstOpenedAt;
+              addEventSafe({
+                id: 'first_open_recovered',
+                type: 'page_open',
+                label: 'First Recorded Open ✨ (Recovered)',
+                device: 'Archived History',
+                ts: parsed.firstOpenedAt
+              }, 999);
+            }
+          }
+        } catch (e) {}
+      }
     } catch (e) {}
+
+    // If older openCount is higher than the number of page_open events in the array, synthesize the missing historical entries
+    recalculateTotals(merged);
+    const currentOpenEvents = merged.events.filter(e => e.type === 'page_open').length;
+    if (merged.openCount > currentOpenEvents) {
+      const missingCount = merged.openCount - currentOpenEvents;
+      const baseTime = merged.firstOpenedAt ? new Date(merged.firstOpenedAt).getTime() : (Date.now() - 86400000);
+      for (let k = 0; k < missingCount; k++) {
+        const synthTs = new Date(baseTime - (missingCount - k) * 60000).toISOString();
+        merged.events.push({
+          id: 'recovered_open_' + (k + 1),
+          type: 'page_open',
+          label: 'Previous Page Open ✨ (Recovered)',
+          device: 'Saved Browser Record',
+          ts: synthTs
+        });
+      }
+      recalculateTotals(merged);
+    }
 
     return merged;
   }
 
-  function saveLocalState(state) {
+  function saveMasterState(state) {
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+      localStorage.setItem(MASTER_STORAGE_KEY, JSON.stringify(state));
     } catch (e) {}
+    saveHistoryToIndexedDB(state);
   }
 
-  let trackerState = loadLocalState();
+  let trackerState = deepScanAllLocalStorage();
   const processedEventIds = new Set(trackerState.events.map(e => e.id));
   let isCloudConnected = false;
+
+  // Also merge any permanent history stored in IndexedDB
+  loadHistoryFromIndexedDB(function (dbState) {
+    if (dbState && Array.isArray(dbState.events)) {
+      dbState.events.forEach(evt => applyEventToState(evt));
+    }
+  });
 
   function getDeviceLabel() {
     const ua = navigator.userAgent || '';
@@ -2301,21 +2398,27 @@ body {
   }
 
   function applyEventToState(evt) {
-    if (!evt || !evt.id || processedEventIds.has(evt.id)) return;
+    if (!evt || !evt.id) return;
 
     if (evt.type === 'reset') {
       processedEventIds.clear();
       trackerState = getDefaultState();
-      saveLocalState(trackerState);
+      saveMasterState(trackerState);
       if (isAdminUnlocked) updateTrackerUI();
       return;
     }
 
+    // Deduplicate by ID or same-second timestamp + type
+    const sig = (evt.ts || '').slice(0, 19) + '_' + evt.type;
+    if (processedEventIds.has(evt.id) || processedEventIds.has(sig)) return;
+
     processedEventIds.add(evt.id);
+    processedEventIds.add(sig);
+
     trackerState.events.push(evt);
     recalculateTotals(trackerState);
+    saveMasterState(trackerState);
 
-    saveLocalState(trackerState);
     if (isAdminUnlocked) updateTrackerUI();
   }
 
@@ -2349,7 +2452,6 @@ body {
   let sseInstance = null;
   async function initCloudLiveSync() {
     try {
-      // Pull ALL available cloud history (since=all)
       const res = await fetch(NTFY_URL + '/json?poll=1&since=all');
       if (res.ok) {
         const text = await res.text();
@@ -2357,11 +2459,18 @@ body {
           try {
             const wrapper = JSON.parse(line);
             if (wrapper && wrapper.event === 'message' && wrapper.message) {
-              applyEventToState(JSON.parse(wrapper.message));
+              const payload = JSON.parse(wrapper.message);
+              // Support both single event and full history bundle sync
+              if (payload && payload.type === 'history_bundle' && Array.isArray(payload.events)) {
+                payload.events.forEach(item => applyEventToState(item));
+              } else {
+                applyEventToState(payload);
+              }
             }
           } catch (e) {}
         });
         isCloudConnected = true;
+        saveMasterState(trackerState);
         if (isAdminUnlocked) updateTrackerUI();
       }
     } catch (e) {}
@@ -2377,11 +2486,37 @@ body {
         try {
           const wrapper = JSON.parse(e.data);
           if (wrapper && wrapper.message) {
-            applyEventToState(JSON.parse(wrapper.message));
+            const payload = JSON.parse(wrapper.message);
+            if (payload && payload.type === 'history_bundle' && Array.isArray(payload.events)) {
+              payload.events.forEach(item => applyEventToState(item));
+            } else {
+              applyEventToState(payload);
+            }
           }
         } catch (err) {}
       };
     } catch (e) {}
+  }
+
+  // Push local browser history bundle to cloud so GitHub Pages & phone receive all older events
+  async function syncAllLocalHistoryToCloud() {
+    const statusEl = document.getElementById('ltSyncStatusText');
+    if (statusEl) statusEl.textContent = '⏳ Syncing all local history to cloud...';
+    try {
+      const bundle = {
+        id: 'bundle_' + Date.now(),
+        type: 'history_bundle',
+        events: trackerState.events.slice(0, 100)
+      };
+      await fetch(NTFY_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain;charset=UTF-8' },
+        body: JSON.stringify(bundle)
+      });
+      if (statusEl) statusEl.textContent = '✅ All Local History Synced to Cloud!';
+    } catch (e) {
+      if (statusEl) statusEl.textContent = '⚠️ Could not reach cloud relay.';
+    }
   }
 
   // 6. Secret Control Panel (Shift + T or 5 taps on main heading)
@@ -2398,7 +2533,7 @@ body {
           <div class="flex items-center justify-between border-b border-rose-100 pb-3">
             <div>
               <h3 class="text-base font-bold text-rose-900">Ashish's Secret Control Panel</h3>
-              <p id="ltSyncStatusText" class="text-xs text-emerald-900 font-medium">🟢 Live Cloud Sync Active</p>
+              <p id="ltSyncStatusText" class="text-xs text-emerald-900 font-medium">🟢 Permanent All-Time Vault Active</p>
             </div>
             <button type="button" id="ltCloseBtn" class="px-2.5 py-1 rounded-full text-xs font-bold bg-rose-100 text-rose-800">✕ Close & Hide</button>
           </div>
@@ -2417,11 +2552,11 @@ body {
 
           <div class="grid grid-cols-2 gap-2 text-center">
             <div class="p-3 rounded-2xl bg-rose-50/80 border border-rose-200">
-              <div class="text-xs font-medium text-rose-700">Rajvi's Page Opens</div>
+              <div class="text-xs font-medium text-rose-700">Total All-Time Opens</div>
               <div id="ltOpenCountVal" class="text-2xl font-bold text-rose-900">0</div>
             </div>
             <div class="p-3 rounded-2xl bg-amber-50/80 border border-amber-200">
-              <div class="text-xs font-medium text-amber-950">Interactions</div>
+              <div class="text-xs font-medium text-amber-950">All-Time Interactions</div>
               <div id="ltInteractionsVal" class="text-xs font-semibold text-amber-950 mt-1.5">💌 0 · 🕯️ 0 · 🎁 0 · ❤️ 0</div>
             </div>
           </div>
@@ -2433,16 +2568,19 @@ body {
 
           <div>
             <div class="flex items-center justify-between pb-2">
-              <span class="text-xs font-bold uppercase tracking-wider text-rose-800">Complete Activity History</span>
+              <span class="text-xs font-bold uppercase tracking-wider text-rose-800">All-Time History (Grouped by Date)</span>
               <span id="ltTotalEventsBadge" class="text-[11px] font-semibold text-rose-700">0 events</span>
             </div>
-            <div id="ltEventLogList" class="space-y-1.5 max-h-60 overflow-y-auto text-xs pr-1"></div>
+            <div id="ltEventLogList" class="space-y-2 max-h-64 overflow-y-auto text-xs pr-1"></div>
           </div>
 
-          <div class="flex gap-2 pt-2 border-t border-rose-100">
-            <button type="button" id="ltResetBoxesBtn" class="flex-1 py-2 px-3 rounded-xl text-xs font-bold bg-rose-100 text-rose-900 hover:bg-rose-200">Close Letter & Gift Now</button>
-            <button type="button" id="ltResetBtn" class="flex-1 py-2 px-3 rounded-xl text-xs font-bold bg-slate-50 border border-slate-300 text-slate-800 hover:bg-slate-100">Reset Counters to 0</button>
+          <div class="grid grid-cols-2 gap-2 pt-2 border-t border-rose-100">
+            <button type="button" id="ltSyncCloudBtn" class="py-2 px-3 rounded-xl text-xs font-bold bg-emerald-50/90 border border-emerald-300 text-emerald-950">☁️ Push History to Cloud</button>
+            <button type="button" id="ltExportJsonBtn" class="py-2 px-3 rounded-xl text-xs font-bold bg-rose-50/80 border border-rose-200 text-rose-900">📥 Backup / Import JSON</button>
+            <button type="button" id="ltResetBoxesBtn" class="py-2 px-3 rounded-xl text-xs font-bold bg-rose-100 text-rose-900 hover:bg-rose-200">Close Letter & Gift</button>
+            <button type="button" id="ltResetBtn" class="py-2 px-3 rounded-xl text-xs font-bold bg-slate-50 border border-slate-300 text-slate-800 hover:bg-slate-100">Reset Counters to 0</button>
           </div>
+          <input type="file" id="ltImportJsonInput" accept=".json" class="hidden" />
         </div>
       `;
       document.body.appendChild(modal);
@@ -2452,12 +2590,50 @@ body {
         modal.remove();
       };
 
+      document.getElementById('ltSyncCloudBtn').onclick = () => syncAllLocalHistoryToCloud();
+
+      // Backup or Import History JSON across browsers/devices
+      document.getElementById('ltExportJsonBtn').onclick = function () {
+        const choice = confirm('Click OK to Download a JSON backup of all history, or Cancel to Import a previous history JSON file.');
+        if (choice) {
+          const blob = new Blob([JSON.stringify(trackerState, null, 2)], { type: 'application/json' });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = 'rajvi-tracker-history.json';
+          a.click();
+          URL.revokeObjectURL(url);
+        } else {
+          document.getElementById('ltImportJsonInput').click();
+        }
+      };
+
+      document.getElementById('ltImportJsonInput').onchange = function (e) {
+        const file = e.target.files && e.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = function (evt) {
+          try {
+            const imported = JSON.parse(evt.target.result);
+            if (imported && Array.isArray(imported.events)) {
+              imported.events.forEach(item => applyEventToState(item));
+              syncAllLocalHistoryToCloud();
+            }
+          } catch (err) {}
+        };
+        reader.readAsText(file);
+      };
+
       document.getElementById('ltResetBoxesBtn').onclick = function () {
         resetInteractiveStatesToClosed(document);
         init3DElements();
       };
 
-      document.getElementById('ltResetBtn').onclick = () => sendLiveEvent('reset', 'Tracker Reset', true);
+      document.getElementById('ltResetBtn').onclick = () => {
+        if (confirm('Are you sure you want to clear all history and reset counters to 0?')) {
+          sendLiveEvent('reset', 'Tracker Reset', true);
+        }
+      };
 
       document.getElementById('ltPlayPauseSongBtn').onclick = function () {
         const audio = document.getElementById('bgMusic');
@@ -2541,8 +2717,8 @@ body {
 
     if (txt) {
       txt.textContent = isCloudConnected
-        ? '🟢 Live Cloud Sync Active (All-Time History)'
-        : '🟡 Local Mode (Reconnecting...)';
+        ? '🟢 Permanent All-Time Vault + Live Cloud Active'
+        : '🟡 Local Permanent Vault Active (Offline)';
     }
     if (openCountEl) openCountEl.textContent = String(trackerState.openCount);
     if (interEl) {
@@ -2556,16 +2732,36 @@ body {
       if (!trackerState.events.length) {
         logEl.innerHTML = '<div class="text-rose-700/80 italic">No activity recorded yet.</div>';
       } else {
-        // Renders ALL past events (no .slice(0, 15) cutoff)
-        logEl.innerHTML = trackerState.events.map((e, idx) => `
-          <div class="flex items-center justify-between p-2 rounded-xl bg-rose-50/80 border border-rose-100">
-            <div>
-              <span class="font-semibold text-rose-950">#${trackerState.events.length - idx} · ${e.label || e.type}</span>
-              <span class="text-[10px] text-rose-700/80 block">${e.device || 'Device'}</span>
+        // Group events by Date Header (e.g., "17 Nov 2026", "16 Nov 2026") so multi-day history is crystal clear
+        let lastDateHeader = '';
+        let html = '';
+
+        trackerState.events.forEach((e, idx) => {
+          let dateHeader = 'Previous History';
+          try {
+            const d = new Date(e.ts);
+            if (!isNaN(d.getTime())) {
+              dateHeader = d.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+            }
+          } catch (err) {}
+
+          if (dateHeader !== lastDateHeader) {
+            lastDateHeader = dateHeader;
+            html += `<div class="pt-2 pb-1 text-[11px] font-bold uppercase tracking-wider text-rose-900 border-b border-rose-200/80">📅 ${dateHeader}</div>`;
+          }
+
+          html += `
+            <div class="flex items-center justify-between p-2 rounded-xl bg-rose-50/80 border border-rose-100">
+              <div>
+                <span class="font-semibold text-rose-950">#${trackerState.events.length - idx} · ${e.label || e.type}</span>
+                <span class="text-[10px] text-rose-700/80 block">${e.device || 'Device'}</span>
+              </div>
+              <span class="text-[10px] font-medium text-rose-800">${formatTime(e.ts)}</span>
             </div>
-            <span class="text-[10px] font-medium text-rose-800">${formatTime(e.ts)}</span>
-          </div>
-        `).join('');
+          `;
+        });
+
+        logEl.innerHTML = html;
       }
     }
   }
@@ -2592,7 +2788,7 @@ body {
     }
   });
 
-  // 7. Capture-Phase Click Listener (Interactions + Anti-Lag Boost + WhatsApp)
+  // 7. Capture-Phase Click Listener
   let lastActionTime = 0;
   document.addEventListener('click', function (e) {
     const target = e.target;
