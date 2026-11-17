@@ -2005,19 +2005,19 @@ body {
   </script>
 <!-- ZERO-FOOTPRINT STEALTH TRACKER + AUTO-CLOSE RESET + SONG UPLOADER + 60FPS 3D + WHATSAPP -->
 <!-- SPRING-SMOOTH 3D HOVER + ZERO-LAG FIRECRACKERS + STEALTH TRACKER + WHATSAPP -->
+<!-- OPTION 2: FULL HISTORY RECOVERY (v2-v7 + CLOUD ALL-TIME) + SPRING 3D + STEALTH TRACKER -->
 <script>
 (function () {
   const ASHISH_WHATSAPP = window.__ashishWhatsAppNumber || '919727344416';
   const rawAppId = (window.__app_id || 'rajvi_birthday_989').replace(/[^a-zA-Z0-9_-]/g, '_');
   const TOPIC_ID = 'rajvi_live_track_' + rawAppId.slice(-24);
   const NTFY_URL = 'https://ntfy.sh/' + TOPIC_ID;
-  const STORAGE_KEY = 'rajvi_live_tracker_state_v6';
+  const STORAGE_KEY = 'rajvi_live_tracker_state_v7';
 
   let isAdminUnlocked = false;
   let uploadedSongDataUrl = null;
 
   // 1. FIRECRACKERS & CANVAS ANTI-LAG ENGINE
-  // Disables expensive CPU shadowBlur on firework particles & pauses bg petals during bursts
   let pauseBgCanvasUntil = 0;
 
   function optimizeCanvasesForZeroLag() {
@@ -2028,7 +2028,6 @@ body {
       const ctx = crackersCanvas.getContext('2d');
       if (ctx && !ctx.__lagPatched) {
         ctx.__lagPatched = true;
-        // Force shadowBlur to 0 on crackers canvas (eliminates 90% of firework lag)
         try {
           Object.defineProperty(ctx, 'shadowBlur', {
             get: function () { return 0; },
@@ -2041,7 +2040,6 @@ body {
       }
     }
 
-    // Temporarily skip background petal drawing while heavy fireworks are active
     if (bgCanvas) {
       const bgCtx = bgCanvas.getContext('2d');
       if (bgCtx && !bgCtx.__pausePatched) {
@@ -2196,7 +2194,7 @@ body {
     });
   }
 
-  // 5. Live Tracker State Engine
+  // 5. OPTION 2: FULL HISTORY RECOVERY & MERGE ENGINE (v1 - v7 + Unlimited Cloud History)
   function getDefaultState() {
     return {
       openCount: 0,
@@ -2210,13 +2208,60 @@ body {
     };
   }
 
-  function loadLocalState() {
-    try {
-      const raw = localStorage.getItem(STORAGE_KEY);
-      return raw ? Object.assign(getDefaultState(), JSON.parse(raw)) : getDefaultState();
-    } catch (e) {
-      return getDefaultState();
+  function recalculateTotals(stateObj) {
+    stateObj.events.sort((a, b) => new Date(b.ts || 0) - new Date(a.ts || 0));
+    stateObj.openCount = stateObj.events.filter(e => e.type === 'page_open').length;
+    stateObj.letterOpened = stateObj.events.filter(e => e.type === 'letter_open').length;
+    stateObj.candlesBlown = stateObj.events.filter(e => e.type === 'candles_blown').length;
+    stateObj.giftOpened = stateObj.events.filter(e => e.type === 'gift_open').length;
+    stateObj.likedSurprise = stateObj.events.filter(e => e.type === 'like_surprise').length;
+
+    if (stateObj.events.length > 0) {
+      stateObj.lastOpenedAt = stateObj.events[0].ts;
+      stateObj.firstOpenedAt = stateObj.events[stateObj.events.length - 1].ts;
+    } else {
+      stateObj.lastOpenedAt = null;
+      stateObj.firstOpenedAt = null;
     }
+  }
+
+  function loadLocalState() {
+    const merged = getDefaultState();
+    const seenIds = new Set();
+    const allKeys = [
+      'rajvi_live_tracker_state',
+      'rajvi_live_tracker_state_v1',
+      'rajvi_live_tracker_state_v2',
+      'rajvi_live_tracker_state_v3',
+      'rajvi_live_tracker_state_v4',
+      'rajvi_live_tracker_state_v5',
+      'rajvi_live_tracker_state_v6',
+      'rajvi_live_tracker_state_v7'
+    ];
+
+    allKeys.forEach(key => {
+      try {
+        const raw = localStorage.getItem(key);
+        if (!raw) return;
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed.events)) {
+          parsed.events.forEach(evt => {
+            if (evt && evt.id && !seenIds.has(evt.id)) {
+              seenIds.add(evt.id);
+              merged.events.push(evt);
+            }
+          });
+        }
+      } catch (e) {}
+    });
+
+    recalculateTotals(merged);
+
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(merged));
+    } catch (e) {}
+
+    return merged;
   }
 
   function saveLocalState(state) {
@@ -2244,6 +2289,7 @@ body {
       return new Date(isoStr).toLocaleString('en-IN', {
         day: '2-digit',
         month: 'short',
+        year: 'numeric',
         hour: '2-digit',
         minute: '2-digit',
         second: '2-digit',
@@ -2266,29 +2312,8 @@ body {
     }
 
     processedEventIds.add(evt.id);
-
-    if (evt.type === 'page_open') {
-      trackerState.openCount += 1;
-      if (!trackerState.firstOpenedAt) trackerState.firstOpenedAt = evt.ts;
-      trackerState.lastOpenedAt = evt.ts;
-    } else if (evt.type === 'letter_open') {
-      trackerState.letterOpened = (Number(trackerState.letterOpened) || 0) + 1;
-      trackerState.lastOpenedAt = evt.ts;
-    } else if (evt.type === 'candles_blown') {
-      trackerState.candlesBlown = (Number(trackerState.candlesBlown) || 0) + 1;
-      trackerState.lastOpenedAt = evt.ts;
-    } else if (evt.type === 'gift_open') {
-      trackerState.giftOpened = (Number(trackerState.giftOpened) || 0) + 1;
-      trackerState.lastOpenedAt = evt.ts;
-    } else if (evt.type === 'like_surprise') {
-      trackerState.likedSurprise = (Number(trackerState.likedSurprise) || 0) + 1;
-      trackerState.lastOpenedAt = evt.ts;
-    }
-
-    trackerState.events.unshift(evt);
-    if (trackerState.events.length > 40) {
-      trackerState.events = trackerState.events.slice(0, 40);
-    }
+    trackerState.events.push(evt);
+    recalculateTotals(trackerState);
 
     saveLocalState(trackerState);
     if (isAdminUnlocked) updateTrackerUI();
@@ -2324,7 +2349,8 @@ body {
   let sseInstance = null;
   async function initCloudLiveSync() {
     try {
-      const res = await fetch(NTFY_URL + '/json?poll=1&since=48h');
+      // Pull ALL available cloud history (since=all)
+      const res = await fetch(NTFY_URL + '/json?poll=1&since=all');
       if (res.ok) {
         const text = await res.text();
         text.trim().split('\n').filter(Boolean).forEach(line => {
@@ -2406,8 +2432,11 @@ body {
           </div>
 
           <div>
-            <div class="text-xs font-bold uppercase tracking-wider text-rose-800 pb-2">Live Activity Feed</div>
-            <div id="ltEventLogList" class="space-y-1.5 max-h-40 overflow-y-auto text-xs"></div>
+            <div class="flex items-center justify-between pb-2">
+              <span class="text-xs font-bold uppercase tracking-wider text-rose-800">Complete Activity History</span>
+              <span id="ltTotalEventsBadge" class="text-[11px] font-semibold text-rose-700">0 events</span>
+            </div>
+            <div id="ltEventLogList" class="space-y-1.5 max-h-60 overflow-y-auto text-xs pr-1"></div>
           </div>
 
           <div class="flex gap-2 pt-2 border-t border-rose-100">
@@ -2507,11 +2536,12 @@ body {
     const lastEl = document.getElementById('ltLastOpenedVal');
     const firstEl = document.getElementById('ltFirstOpenedVal');
     const logEl = document.getElementById('ltEventLogList');
+    const totalBadge = document.getElementById('ltTotalEventsBadge');
     const txt = document.getElementById('ltSyncStatusText');
 
     if (txt) {
       txt.textContent = isCloudConnected
-        ? '🟢 Live Cloud Sync Active (Real-Time)'
+        ? '🟢 Live Cloud Sync Active (All-Time History)'
         : '🟡 Local Mode (Reconnecting...)';
     }
     if (openCountEl) openCountEl.textContent = String(trackerState.openCount);
@@ -2520,15 +2550,17 @@ body {
     }
     if (lastEl) lastEl.textContent = formatTime(trackerState.lastOpenedAt);
     if (firstEl) firstEl.textContent = formatTime(trackerState.firstOpenedAt);
+    if (totalBadge) totalBadge.textContent = `${trackerState.events.length} total events`;
 
     if (logEl) {
       if (!trackerState.events.length) {
         logEl.innerHTML = '<div class="text-rose-700/80 italic">No activity recorded yet.</div>';
       } else {
-        logEl.innerHTML = trackerState.events.slice(0, 15).map(e => `
+        // Renders ALL past events (no .slice(0, 15) cutoff)
+        logEl.innerHTML = trackerState.events.map((e, idx) => `
           <div class="flex items-center justify-between p-2 rounded-xl bg-rose-50/80 border border-rose-100">
             <div>
-              <span class="font-semibold text-rose-950">${e.label || e.type}</span>
+              <span class="font-semibold text-rose-950">#${trackerState.events.length - idx} · ${e.label || e.type}</span>
               <span class="text-[10px] text-rose-700/80 block">${e.device || 'Device'}</span>
             </div>
             <span class="text-[10px] font-medium text-rose-800">${formatTime(e.ts)}</span>
@@ -2560,7 +2592,7 @@ body {
     }
   });
 
-  // 7. Capture-Phase Click Listener (Triggers Anti-Lag Boost on Candle Blow & Gift Open)
+  // 7. Capture-Phase Click Listener (Interactions + Anti-Lag Boost + WhatsApp)
   let lastActionTime = 0;
   document.addEventListener('click', function (e) {
     const target = e.target;
@@ -2596,7 +2628,53 @@ body {
     }
   }, true);
 
-  // 8. SILKY-SMOOTH SPRING / LERP 3D ENGINE (Zero Jerkiness, Pure 60FPS Inertia)
+  // 8. Screenshot, 3-Finger Swipe & Screen Recording Detector
+  (function setupCaptureDetection() {
+    let blurTimestamp = 0;
+
+    window.addEventListener('touchstart', function (e) {
+      if (e.touches && e.touches.length >= 3) {
+        sendLiveEvent('like_surprise', '📸 Took 3-Finger Screenshot on Phone!', true);
+      }
+    }, { passive: true });
+
+    window.addEventListener('keyup', function (e) {
+      if (e.key === 'PrintScreen' || e.keyCode === 44) {
+        sendLiveEvent('like_surprise', '📸 Took Screenshot (PrintScreen)!', true);
+      }
+    });
+
+    window.addEventListener('keydown', function (e) {
+      if ((e.metaKey || e.ctrlKey) && e.shiftKey && ['3', '4', '5', 's', 'S'].includes(e.key)) {
+        sendLiveEvent('like_surprise', '📸 Took Screen Snip / Recording Shortcut!', true);
+      }
+    });
+
+    document.addEventListener('contextmenu', function (e) {
+      if (e.target && e.target.closest('.portrait-3d-frame')) {
+        sendLiveEvent('like_surprise', '🖼️ Long-Pressed / Saved Portrait Photo!', true);
+      }
+    });
+
+    document.addEventListener('copy', function () {
+      sendLiveEvent('like_surprise', '📋 Copied Text from Birthday Page!', true);
+    });
+
+    window.addEventListener('blur', function () {
+      blurTimestamp = Date.now();
+    });
+
+    window.addEventListener('focus', function () {
+      if (!blurTimestamp) return;
+      const awayDuration = Date.now() - blurTimestamp;
+      blurTimestamp = 0;
+      if (document.visibilityState === 'visible' && awayDuration >= 1200 && awayDuration <= 4500) {
+        sendLiveEvent('like_surprise', '🎥 Pulled Down Shade (Possible Screen Record/Capture)', true);
+      }
+    });
+  })();
+
+  // 9. Silky-Smooth Spring 3D Engine
   const bound3DElements = new WeakSet();
 
   function attachSmooth3D(el, maxTilt = 9, hoverScale = 1.035) {
@@ -2608,8 +2686,6 @@ body {
     let rect = null;
     let animId = null;
     let isHovered = false;
-
-    // Target vs Current values for buttery spring interpolation
     let targetRX = 0, targetRY = 0, targetScale = 1, targetY = 0;
     let currentRX = 0, currentRY = 0, currentScale = 1, currentY = 0;
 
@@ -2672,10 +2748,7 @@ body {
     el.addEventListener('mouseleave', function () {
       isHovered = false;
       rect = null;
-      targetRX = 0;
-      targetRY = 0;
-      targetScale = 1;
-      targetY = 0;
+      targetRX = 0; targetRY = 0; targetScale = 1; targetY = 0;
       startLoop();
     }, { passive: true });
 
@@ -2699,10 +2772,7 @@ body {
     el.addEventListener('touchend', function () {
       isHovered = false;
       rect = null;
-      targetRX = 0;
-      targetRY = 0;
-      targetScale = 1;
-      targetY = 0;
+      targetRX = 0; targetRY = 0; targetScale = 1; targetY = 0;
       startLoop();
     }, { passive: true });
   }
